@@ -5,6 +5,8 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Permissions;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -14,10 +16,22 @@ namespace TweenyWindowsForm
 {
    public partial class Form1 : Form
    {
-      private HidDevice _device;
+      private const int WM_DEVICECHANGE = 0x0219;
+      private const int DBT_DEVNODES_CHANGED = 0x0007; //device changed
       private const int VendorId = 0x16C0;
       private const int ProductId = 0x0486;
 
+      [SecurityPermission(SecurityAction.LinkDemand, Flags = SecurityPermissionFlag.UnmanagedCode)]
+      protected override void WndProc(ref Message m)
+      {
+         if (m.Msg == WM_DEVICECHANGE && m.WParam.ToInt32() == DBT_DEVNODES_CHANGED)
+         {
+            Debug.WriteLine("usb change");
+         } 
+         base.WndProc(ref m);
+      } 
+
+      private HidDevice _device; 
       private bool _isAttached = false;
 
       public Form1()
@@ -119,11 +133,12 @@ namespace TweenyWindowsForm
 
       private void sendButton_Click(object sender, EventArgs e)
       {
-         var data = new byte[64];
+         const int size = 64;
+         var data = new byte[size];
          byte result;
          if (byte.TryParse(valueTextBox.Text, out result))
          {
-            data[0] = result;
+            data[1] = result;
          }
          else
          {
@@ -131,7 +146,7 @@ namespace TweenyWindowsForm
             return;
          }
 
-         var report = new HidReport(1, new HidDeviceData(data, HidDeviceData.ReadStatus.Success));
+         var report = new HidReport(64, new HidDeviceData(data, HidDeviceData.ReadStatus.Success));
          var status = _device.WriteReport(report);
          return;
       }
